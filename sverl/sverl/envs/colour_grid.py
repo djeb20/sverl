@@ -1,0 +1,98 @@
+import random
+import numpy as np
+from collections import defaultdict
+import gymnasium
+
+"""
+2 x 2 Gridworld
+    - Random start state.
+    - Reward is +1 for moving clockwise.
+    - Features are a square's index and colour {green: 0, red: 1, blue: 2}.
+    - Coordinates are also used for dynamics.
+    """
+
+class ColourGrid(gymnasium.Env):
+
+    def __init__(self, seed:int=None):
+        super().__init__()
+
+        # 2 height and 2 width
+        self.H = 2; self.W = 2
+        self.grid = np.zeros((self.H, self.W))
+
+        # Define spaces
+        self.observation_space = gymnasium.spaces.MultiDiscrete(np.array([2, 2]))
+        self.action_space = gymnasium.spaces.Discrete(4)
+
+        # Set seed
+        if seed is not None: 
+            self.seed(seed)
+
+        # Domain characteristics (each state has coordinates and index/colour features).
+        self.states = {(0, 0): [3, 0], (1, 0): [4, 0], 
+                       (0, 1): [1, 1], (1, 1): [2, 2]}
+        self.actions = {0: [0, 1], 1: [1, 0], 
+                        2: [0, -1], 3: [-1, 0]}
+        self.rewards = defaultdict(lambda: defaultdict(float))
+        for state, action in zip(self.states, [0, 3, 1, 2]):
+            self.rewards[state][action] = 1
+
+        # Define transition dynamics
+        self.get_P()
+
+    def seed(self, seed:int):
+        """
+        Sets seed for environment.
+        """
+
+        np.random.seed(seed)
+        random.seed(seed)
+        self.action_space.seed(seed)
+        self.observation_space.seed(seed)
+
+    def get_P(self):
+        """
+        Defines the transition dynamics.
+        """
+
+        self.P = defaultdict(lambda: defaultdict(list))
+        
+        # Transition for every state
+        for state in self.states:
+            for action_ind, action in self.actions.items():
+
+                # Converts action int to vector, 'Take step'
+                n_state = np.array(state) + action
+                
+                # Check if "hit wall".
+                if not ((0 <= n_state[1] < self.H) and (0 <= n_state[0] < self.W)): 
+                    n_state = np.array(state)
+
+                # Update transition dictionary using index/colour features.
+                trans = [1, self.states[*n_state], self.rewards[*state][action_ind], False, False]
+                self.P[*self.states[*state]][action_ind].append(trans)
+
+    def reset(self, seed:int=None):
+        """
+        Randomly places the agent in one of the bottom two squares.
+        """
+
+        if seed is not None: 
+            self.seed(seed)
+
+        self.pos = random.choice(list(self.P))
+
+        return self.pos.copy(), {}
+
+    def step(self, action):
+        """
+        Takes a step in the environment
+        """
+
+        # Deterministic env so no sampling needed (just take the first).
+        self.pos, reward, terminated, truncated = self.P[*self.pos][action][0][1:]
+
+        return self.pos.copy(), reward, terminated, truncated, {}
+    
+    def render(self):
+        print(self.pos)
