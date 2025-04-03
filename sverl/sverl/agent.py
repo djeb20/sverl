@@ -1,4 +1,3 @@
-import pickle
 import numpy as np
 from collections import defaultdict
     
@@ -7,7 +6,7 @@ class Agent:
     Usual Q learning agent.
     """
     
-    def __init__(self, env, agent_args, actions=None):
+    def __init__(self, env, agent_args):
 
         self.action_space = env.action_space
         
@@ -18,11 +17,11 @@ class Agent:
         # Q values
         self.Q_table = defaultdict(lambda: np.zeros(env.action_space.n))
 
-        # actions is a dictionary of valid actions for each state.
-        if actions is None:
-            self.actions = defaultdict(lambda: np.arange(env.action_space.n))
+        # Dictionary of valid actions for each state.
+        if hasattr(env, 'valid_actions'):
+            self.actions = env.valid_actions
         else:
-            self.actions = actions
+            self.actions = defaultdict(lambda: np.arange(env.action_space.n))
 
     def choose_action(self, obs, exp=True):
 

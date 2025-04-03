@@ -33,7 +33,7 @@ class ValuePolicyCharacteristic(Characteristic):
     def __init__(self, agent, env, steady_state):
         super().__init__(agent, env, steady_state)
 
-    def get_exact(self, disp=False):
+    def get_exact(self, disp=False, save=True):
         """
         Calculates the exact characteristic values for policy and prediction.
             - Assumes steady_state is a good approximation.
@@ -60,15 +60,19 @@ class ValuePolicyCharacteristic(Characteristic):
                 cond_dist = dist[indexes] / dist[indexes].sum()
                 self.exact[*m_ob] = (targets[indexes] * cond_dist[:, None]).sum(axis=0)
 
-        with open(f'{self.__class__.__name__.lower()}_char.pkl', "wb") as f:
-            pickle.dump(self.exact, f)
+        if save:
+            with open(f'{self.__class__.__name__.lower()}_char.pkl', "wb") as f:
+                pickle.dump(self.exact, f)
 
         if disp:
             print(f'Exact characteristic values: {self.exact}')
 
     def get_exact_val(self, e_ob, C):
-        # Get the exact characteristic value for a given observation and coalition.
-        return self.exact[*np.where(C.astype(bool), e_ob, self.mask)]
+
+        if tuple(np.where(C.astype(bool), e_ob, self.mask)) not in self.exact:
+            print(f'm_ob not in exact; e_ob: {e_ob}, C: {C}, m_ob: {np.where(C.astype(bool), e_ob, self.mask)}')
+
+        return self.exact[*np.where(C.astype(bool), e_ob, self.mask)].copy()
     
 class ValueCharacteristic(ValuePolicyCharacteristic):
     def __init__(self, agent, env, steady_state):
@@ -93,18 +97,30 @@ class PerformanceCharacteristic(Characteristic):
         # Performance characteristics are calculated using the policy characteristic.
         self.char = policy_char
 
-    def exact_pi(self, obs, e_obs, Cs):
+    def exact_pi(self, obs, e_obs, C):
 
-        # Policy is policy characteristic at explained state (e_obs) and fully-observed pi elsewhere.
+        # Policy characteristic at explained state (e_obs)
         if (obs == e_obs).all():
-            return self.char.get_exact_val(e_obs, Cs)
+
+            # Policy characteristic
+            pi_C = self.char.get_exact_val(e_obs, C)
+
+            # Mask out invalid actions
+            valid_actions = self.agent.actions[e_obs.tobytes()]
+            pi = np.zeros_like(pi_C, dtype=float)
+            pi[valid_actions] = pi_C[valid_actions]
+
+            # Normalise and return
+            return pi / pi.sum()
+        
+        # Fully-observed pi elsewhere
         else:
             return self.char.v_F(obs)
 
-    def choose_action(self, obs, e_obs, Cs):
-        return np.random.choice(self.env.action_space.n, p=self.exact_pi(obs, e_obs, Cs))
+    def choose_action(self, obs, e_obs, C):
+        return np.random.choice(self.env.action_space.n, p=self.exact_pi(obs, e_obs, C))
 
-    def get_exact(self, disp=False, e_obs=None):
+    def get_exact(self, disp=False, e_obs=None, save=True):
         """
         Calculates the exact characteristic values for performance.
             - Can treat C's and e_obs as part of state and train value iteration for single policy. Much faster.
@@ -129,11 +145,12 @@ class PerformanceCharacteristic(Characteristic):
                 Q_table = value_iteration(self.env, gamma=self.agent.args.gamma, policy=policy)
                 self.exact[*C][*e_ob] = (policy(e_ob) * Q_table[*e_ob]).sum(axis=0, keepdims=True)
 
-        with open(f'{self.__class__.__name__.lower()}_char.pkl', "wb") as f:
-            pickle.dump(self.exact, f)
+        if save:
+            with open(f'{self.__class__.__name__.lower()}_char.pkl', "wb") as f:
+                pickle.dump(self.exact, f)
 
         if disp:
             print(f'Exact characteristic values: {self.exact}')
 
     def get_exact_val(self, e_obs, C):
-        return self.exact[*C][*e_obs]
+        return self.exact[*C][*e_obs].copy()

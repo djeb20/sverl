@@ -16,7 +16,7 @@ class Shapley:
 
         return sv + np.expand_dims(norm_fix, axis=-2)
     
-    def get_exact(self, disp=False, e_obs=None):
+    def get_exact(self, disp=False, e_obs=None, save=True):
         """
         Returns the exact Shapley values using weighted least squares (WLS, similar to KernelSHAP but exact).
         """
@@ -42,8 +42,9 @@ class Shapley:
             solutions = np.stack([np.linalg.solve(X.T @ W @ X, X.T @ W @ y) for y in Y]).T
             self.exact[*e_ob] = self.normalise(e_ob, solutions)
 
-        with open(f'{self.__class__.__name__.lower()}_shapley.pkl', "wb") as f:
-            pickle.dump(self.exact, f)
+        if save:
+            with open(f'{self.__class__.__name__.lower()}_shapley.pkl', "wb") as f:
+                pickle.dump(self.exact, f)
 
         if disp:
             print(f'Exact Shapley Values: {self.exact}')

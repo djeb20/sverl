@@ -4,6 +4,7 @@ import numpy as np
 from collections import defaultdict
 import random
 import gymnasium
+from sverl.utils import normalise_transitions
 
 """
 Mastermind
@@ -29,7 +30,6 @@ class Mastermind(gymnasium.Env):
         self.code_size = code_size
         self.guesses = guesses
         self.codes = np.array(list(product(range(digits), repeat=code_size)))
-        self.board = np.full((guesses, self.code_size + 2), -1, dtype=int)
 
         # Define spaces (not strictly correct)
         self.observation_space = gymnasium.spaces.MultiDiscrete(np.full(guesses * (code_size + 2), digits))
@@ -68,34 +68,21 @@ class Mastermind(gymnasium.Env):
 
             n_obs, reward, terminated, truncated, _ = env.step(action)
 
-            P[*obs][action].append([1.0, n_obs, reward, terminated, truncated])
+            P[*obs][action].append([1., n_obs, reward, terminated, truncated])
 
-            if terminated: 
-                return None
-            else:
+            if not terminated: 
                 for action in range(env.action_space.n):
                     inner(copy.deepcopy(env), n_obs, action, P)
 
-        # The point of stochasticity is the hidden codes, so we loop over them, 
-        # collect all possible transitions, and then marginalise below.
+        # Every trajectory for all hidden codes.
         for code in self.codes:
             obs, _ = self.reset()
             self.code = code
             for action in range(self.action_space.n):
                 inner(copy.deepcopy(self), obs, action, P)
 
-        # Now we have a dict of all possible transitions, we need to normalise them.
-        self.P = defaultdict(lambda: defaultdict(list))
-
-        # Normalise transition probabilities
-        for s, values in P.items():
-            for a, transitions in values.items():
-
-                # Count unique transitions to compute p(s', r | s, a)
-                _, index, counts = np.unique([np.r_[*t] for t in transitions], axis=0, return_index=True, return_counts=True)
-                
-                # Normalise transition probabilities based on counts
-                self.P[s][a] = [[count / counts.sum()] + transitions[i][1:] for i, count in zip(index, counts)]
+        # Compute the transition probabilities
+        self.P = normalise_transitions(P)
 
     def reset(self, seed:int=None):
         """
@@ -106,7 +93,7 @@ class Mastermind(gymnasium.Env):
             self.seed(seed)
 
         # Clear board and sample code
-        self.board[:] = -1
+        self.board = np.full((self.guesses, self.code_size + 2), -1, dtype=int)
         self.code = random.choice(self.codes)
 
         # For tracking guesses

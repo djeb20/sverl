@@ -2,7 +2,7 @@ from collections import defaultdict
 import numpy as np
 from tqdm import tqdm
 
-def train_agent(agent, env, total_timesteps, seed:int):
+def train_agent(agent, env, total_timesteps, seed:int=None):
     """
     Q-Learning loop.
     """
@@ -30,7 +30,8 @@ def train_agent(agent, env, total_timesteps, seed:int):
             avg_r = avg_r * count + r
             count += 1
             avg_r /= count
-            pbar.set_description(f'Q-Learning; Avg Return: {avg_r:0.5f}')
+            if count % 10_000 == 0:
+                pbar.set_description(f'Q-Learning; Avg Return: {avg_r:0.5f}')
 
             # Reset
             obs, _ = env.reset()
@@ -38,32 +39,6 @@ def train_agent(agent, env, total_timesteps, seed:int):
 
         else:
             obs = n_obs
-
-def play_episode(env, agent, initial_obs=None, render=False, exp=False):
-    """
-    Plays an episode with a render option.
-    Agent can explore or not.
-    Env starts in initial or given state.
-    """
-    
-    if initial_obs is None: obs, info = env.reset()
-    else: obs, info = env.reset(initial_obs)
-
-    if render: env.render()
-    ret = 0
-    step = 0
-
-    while True:
-
-        action_info = agent.choose_action(obs, exp)
-        obs, reward, terminated, truncated, info = env.step(action_info.action)
-        ret += reward
-        step += 1
-        if render: env.render()
-
-        if terminated or truncated: break
-        
-    return ret, step
 
 def get_steady_state(agent, env, steps):
     """
@@ -129,7 +104,10 @@ def value_iteration(env, gamma, policy='greedy'):
             
             # Greedy vs evaluting for general policy.
             if policy == 'greedy': 
-                V_table[s] = Q_sa.max()
+                if hasattr(env, 'valid_actions'): # For environments with illegal moves.
+                    V_table[s] = Q_sa[env.valid_actions[np.array(s).tobytes()]].max()
+                else:
+                    V_table[s] = Q_sa.max()
             else:
                 V_table[s] = (policy(np.array(s)) * Q_sa).sum()
 
@@ -140,3 +118,25 @@ def value_iteration(env, gamma, policy='greedy'):
                                         for transition in P[s][a]]) 
                                         for a in range(env.action_space.n)]) 
                                         for s in P}
+
+def normalise_transitions(P):
+    """
+    Input: A dict of all possible transitions accounting for stochasticity.
+    Computes the transition probabilities by counting and normalising their frequency.
+    Returns the transition dynamics.
+    """
+
+    # Now we have a dict of all possible transitions, we need to normalise them.
+    new_P = defaultdict(lambda: defaultdict(list))
+
+    # Normalise transition probabilities
+    for s, values in tqdm(P.items(), 'Normalising Transitions'):
+        for a, transitions in values.items():
+
+            # Count unique transitions to compute p(s', r | s, a)
+            _, index, counts = np.unique([np.r_[*t] for t in transitions], axis=0, return_index=True, return_counts=True)
+            
+            # Normalise transition probabilities based on counts
+            new_P[s][a] = [[count / counts.sum()] + transitions[i][1:] for i, count in zip(index, counts)]
+
+    return new_P

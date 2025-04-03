@@ -1,8 +1,10 @@
 from collections import defaultdict
-import copy
+import pickle
 import random
 import numpy as np
 import gymnasium
+from sverl.utils import normalise_transitions
+from tqdm import tqdm
 
 """
 Tic-Tac-Toe
@@ -14,18 +16,7 @@ Tic-Tac-Toe
 class TicTacToe(gymnasium.Env):
     
     def __init__(self, seed:int=None):
-        super().__init__()
-
-        # Converts actions to grid coords
-        self.actions = {0: (0, 0),
-                        1: (0, 1),
-                        2: (0, 2),
-                        3: (1, 0),
-                        4: (1, 1),
-                        5: (1, 2),
-                        6: (2, 0),
-                        7: (2, 1),
-                        8: (2, 2)}
+        super().__init__()        
         
         # Define spaces
         self.observation_space = gymnasium.spaces.MultiDiscrete(np.full(9, 3))
@@ -37,9 +28,23 @@ class TicTacToe(gymnasium.Env):
 
         # Domain characteristics
         self.rewards = {0: 0, 1: 1, 2: -1}
+        self.actions = {
+            0: (0, 0),
+            1: (0, 1),
+            2: (0, 2),
+            3: (1, 0),
+            4: (1, 1),
+            5: (1, 2),
+            6: (2, 0),
+            7: (2, 1),
+            8: (2, 2)
+            }
 
         # Save previously calculated valid actions for boards.
-        self.valid_dict = ValidDict()
+        self.valid_actions = ValidDict()
+
+        # Define transition dynamics
+        self.get_P()
 
     def seed(self, seed:int):
         """
@@ -60,99 +65,106 @@ class TicTacToe(gymnasium.Env):
         P = defaultdict(lambda: defaultdict(list))
 
         # Helper function to recursively step through environment
-        def inner(board, action, P):
+        def inner(obs, action, P):
 
             # Place piece
-            board[self.actions[action]] = 1
+            n_obs = obs.copy()
+            n_obs[self.actions[action]] = 1
 
             # See if game is finished and who won
-            terminated, winner = self.won(board)
+            terminated, winner = self.won(n_obs)
 
+            # Games ends in user win or draw, populate transition
             if terminated:
-                reward = self.rewards[winner]
-                # P = ...
-                return None
+                P[*obs.flatten()][action].append([1., n_obs.flatten(), self.rewards[winner], True, False])
+            
+            # Game not over so Minimax plays
             else:
-                # If game is not over, computer plays.
-                _, best_actions = self.score(board, 2)
 
-                for action in best_actions:
+                # Loop over Minimax's chosen actions
+                for mini_action in self.score(n_obs, 2)[1]:
 
-                    n_board = board.copy()
-                    n_board[self.actions[action]] = 2
+                    # Play oppenent mark
+                    mini_obs = n_obs.copy()
+                    mini_obs[self.actions[mini_action]] = 2
 
                     # See if game is finished and who won
-                    terminated, winner = self.won(board)
-                    reward = self.rewards[winner]
-                    # P = 
+                    terminated, winner = self.won(mini_obs)
+                    
+                    # Completes the transition
+                    trans = [1., mini_obs.flatten(), self.rewards[winner], terminated, False]
+                    P[*obs.flatten()][action].append(trans)
 
-                    if terminated:
-                        return None
-                    else:
-                        for action in self.valid_actions(n_board):
-                            inner(n_board.copy(), action, P)
+                    # If game isn't over, agent to play.
+                    if not terminated:
+                        for n_action in self.valid_actions[mini_obs.tobytes()]:
+                            inner(mini_obs.copy(), n_action, P)
 
-        board = np.zeros((3, 3), dtype=int)
+        # Any initial action is optimal
+        self.mini_start_states = []
+        for action in tqdm(range(self.action_space.n), 'Generating P'):
 
-        # Agent starts
-        for action in self.valid_dict[board.tobytes()]:
-            inner(board.copy(), action, P)
+            # Agent starts
+            inner(np.zeros((3, 3)), action, P)
         
-        # Minimax starts
-        _, minimax_actions = self.score(board, 2)
-        for action in minimax_actions:
+            # Minimax starts
+            mini_obs = np.zeros((3, 3))
+            mini_obs[self.actions[action]] = 2
 
-            n_board = board.copy()
-            n_board[self.actions[action]] = 2
+            # Saving to reset environment to minimax starting.
+            self.mini_start_states.append(mini_obs.flatten())
 
-            inner(n_board.copy(), action, P)
+            # Agent responds to start
+            for agent_action in self.valid_actions[mini_obs.tobytes()]:
+                inner(mini_obs.copy(), agent_action, P)
 
-        # Normalise probabilities
+        # Compute the transition probabilities
+        self.P = normalise_transitions(P)
+
+        with open('P.pkl', 'wb') as f:
+            pickle.dump(dict(self.P), f)
+
+        # with open('P.pkl', 'rb') as f:
+        #     self.P = pickle.load(f)
         
-        
-    def reset(self):
+    def reset(self, seed:int=None):
         """
         Resets the environment for a new game.
-        Or sets env to given state.
+        Starting player is chosen randomly
         """
 
-        self.board = np.zeros((3, 3), dtype=int)
-        if np.random.rand() < 0.5: 
-            self.minmax_player() # Starting player is chosen randomly
+        if seed is not None: 
+            self.seed(seed)
+
+        if random.random() < 0.5:
+            self.board = np.zeros(9)
+        else:
+            self.board = random.choice(self.mini_start_states)
         
-        return self.board.flatten(), {'valid_actions': self.valid_dict[self.board.tobytes()]}
+        return self.board.copy(), {}
         
     def step(self, action):
         """
-        Takes a step and returns reward etc.
+        Agent places mark, either:
+            - Game ends with draw or win
+        Or:    
+            - Minimax plays and:
+            - Games ends with draw or loss,
+            - or play continues 
         """
 
-        if action in self.valid_dict[self.board.tobytes()]:
+        # Check whether action is legal
+        if action not in self.valid_actions[self.board.tobytes()]:
+            raise ValueError(f"Invalid action: {action}; Valid actions: {self.valid_actions[self.board.tobytes()]}")
 
-            # Place piece
-            self.board[self.action_dict[action]] = 1
+        # Next states, rewards and their probabilities
+        all_trans = self.P[*self.board][action]
+        ps = [row[0] for row in all_trans]
 
-            # See if game is finished and who won
-            done, winner = self.won_dict[self.board.tobytes()]
+        # Stochastically selecting one transition
+        self.board, reward, terminated, truncated = all_trans[np.random.choice(len(all_trans), p=ps)][1:]
 
-            if not done:
-
-                # If game is not over, computer plays.
-                self.minmax_player()
-
-                done, winner = self.won_dict[self.board.tobytes()]
-
-            reward = self.reward_dict[winner]
-    
-        else:
-
-            raise ValueError(f"Invalid action: {action}. Valid actions are: {self.valid_dict[self.board.tobytes()]}")
-
-        return self.board.flatten(), reward, done, False, {'valid_actions': self.valid_dict[self.board.tobytes()]}
-        
-    # Currently valid actions.
-    def valid_actions(self, state): 
-        return (state == 0).nonzero()[0]
+        return self.board.copy(), reward, terminated, truncated, {}
         
     def won(self, state):
         """
@@ -180,60 +192,55 @@ class TicTacToe(gymnasium.Env):
                 return True, 2
             
         return terminated, 0
-            
-# THIS IS ALL FOR MINMAX
-
-    def minmax_player(self):
-        """
-        A minmax player plays the optimal move.
-        """
-
-        _, best_moves = self.score_dict[tuple([self.board.tobytes(), 2])]
-        self.board[self.action_dict[np.random.choice(best_moves)]] = 2
 
     def score(self, state, player):
         """
-        Given the game state and whose turn it is returns a tuple (estimated game score, best move to play)
+        Given a board and player, recursively finds best moves for Minimax.
         """
 
-        state_byte = state.tobytes()
+        # Check if game is over and who won.
+        terminated, winner = self.won(state)
 
-        done, winner = self.won_dict[state_byte]
+        # Return score (who won) if terminated
+        if terminated:
+            return (winner + 1) % 3 - 1, None
 
-        if not done: end_score = None
-        else: end_score = (winner + 1) % 3 - 1
-
-        if end_score is not None: return end_score, None
+        # Else continue game with other player.
         else:
-            all_moves = self.valid_dict[state_byte]
-                        
-            scores = np.empty(len(all_moves))
-            
+
+            # Swap player andtrack scores of each branch
             n_player = player % 2 + 1
+            legal_moves = self.valid_actions[state.tobytes()]
+            scores = np.empty(len(legal_moves))
 
-            for i, action in enumerate(all_moves):
+            for i, action in enumerate(legal_moves):
 
+                # Player places mark
                 new_state = state.copy()
-                new_state[self.action_dict[action]] = player
+                new_state[self.actions[action]] = player
 
-                current_score, _ = self.score_dict[tuple([new_state.tobytes(), n_player])]
+                # New state needs new score
+                scores[i] = self.score(new_state, n_player)[0]
 
-                scores[i] = current_score
-
+            # Best move/score depends on player
             if player == 1: 
                 best_score = max(scores)
             elif player == 2: 
                 best_score = min(scores)
 
-            best_moves = all_moves[scores == best_score]
+            best_moves = legal_moves[scores == best_score]
                         
             return best_score, best_moves
 
-class ValidDict(dict, TicTacToe):
+class ValidDict(dict):
+
+    # Valid actions in given state.
+    def valid_actions(self, state): 
+        return (state == 0).nonzero()[0]
     
     def __missing__(self, key):
         
-        val = self.valid_actions(np.frombuffer(key, dtype=np.int_))
+        val = self.valid_actions(np.frombuffer(key))
         self.__setitem__(key, val)
         
         return val   
