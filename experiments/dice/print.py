@@ -17,14 +17,14 @@ print("\n" + header)
 print("-" * len(header))
 
 # Print rows
-for s in states:
+for s, steady_state in zip(states, [0.023832, 0.01813]):
                 
     chars = [char[*np.where([True, True], s, -100)][0],
              char[*np.where([True, False], s, -100)][0],
              char[*np.where([False, True], s, -100)][0],
              char[*np.where([False, False], s, -100)][0]]
         
-    print(f"{str(s):<12} | {"1/36":<7} | "
+    print(f"{str(s):<12} | {steady_state:<7.3f} | "
             f"{chars[0]:<5.2f} | {chars[1]:<5.2f} | {chars[2]:<5.2f} | {chars[3]:<5.2f} | "
             f"{shap[s][0][0]:<7.2f} | {shap[s][1][0]:<7.2f}")
     

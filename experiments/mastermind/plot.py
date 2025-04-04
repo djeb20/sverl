@@ -99,7 +99,7 @@ cbar = fig.colorbar(im, ax=axs, shrink=1, fraction=0.1, orientation="vertical", 
 cbar.ax.set_yticks([-1, 0, 1])
 cbar.ax.tick_params(labelsize=fontsize)
 
-fig.supylabel('Normalised Shapley Value', x=1.09, fontsize=fontsize, rotation=-90, ha='right')
+fig.supylabel('Shapley Value', x=1.09, fontsize=fontsize, rotation=-90, ha='right')
 
 # Adjust layout and save figure
 plt.subplots_adjust(bottom=-.1, left=.3)

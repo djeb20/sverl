@@ -62,4 +62,4 @@ if __name__ == '__main__':
 
     # Shapley
     value_shapley = ValueShapley(value_char)
-    value_shapley.get_exact(e_obs=e_obs)
+    value_shapley.get_exact()

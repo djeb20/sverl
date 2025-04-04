@@ -12,7 +12,7 @@ Mastermind
     - Agent has to guess code.
     - Receives clues:(1) no. digits in right place, (2) no. right digits in wrong place.
     - Episode terminates if code guessed or runs out of guesses.
-    - Reward is -1 a guess and + number of guesses if correct.
+    - Reward is -1 for incorrect guess and 0 otherwise.
 """
 
 class Mastermind(gymnasium.Env):
