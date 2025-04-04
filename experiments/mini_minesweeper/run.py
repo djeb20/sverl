@@ -4,7 +4,7 @@ import gymnasium as gym
 import numpy as np
 from sverl.agent import Agent
 from sverl.envs.mini_minesweeper import MiniMinesweeper
-from sverl.utils import get_steady_state, value_iteration, train_agent
+from sverl.utils import get_steady_state, train_agent
 from sverl.characteristics import PolicyCharacteristic, PerformanceCharacteristic, ValueCharacteristic
 from sverl.shapley import PolicyShapley, PerformanceShapley, ValueShapley
 
@@ -16,12 +16,14 @@ class ExpArgs:
     """The random seed."""
     steady_state: int = 1_000_000
     """The number of state to approximate the steady state."""
+    rollout_eps: int = 1_000
+    """The number of episodes to rollout when approximating characteristic."""
 
 @dataclass
 class AgentArgs:
-    # total_timesteps: int = 1_000_000
-    # """The number of timesteps to train the agent."""
-    epsilon: float = 0.05 # CHANGE
+    total_timesteps: int = 1_000_000 
+    """The number of timesteps to train the agent."""
+    epsilon: float = 0.05
     """The exploration rate."""
     gamma: float = 1
     """The discount factor."""
@@ -32,9 +34,49 @@ class AgentArgs:
 class EnvArgs:
     pass
 
-# States to explain
-e_obs = np.array([[0.,  0.,  1., -1., 0.,  1.,  2., -1., 0.,  1., -1., -1., 0.,  1.,  1.,  1.],
-                  [0.,  0.,  1., -1., 0.,  1.,  2., -1., 0.,  1., -1.,  2., 0.,  1.,  1.,  1.]])
+# First observation to explain.
+e_ob1 = np.array([
+    0.,  0.,  1., -1., 
+    0.,  1.,  2., -1., 
+    0.,  1., -1., -1., 
+    0.,  1.,  1.,  1.
+])
+
+# Possible locations of the mines in the first observation.
+mine_locs1 = np.array(
+    [[
+        [0, 0, 0, 1],
+        [0, 0, 0, 0],
+        [0, 0, 1, 0],
+        [0, 0, 0, 0]],
+    [
+        [0, 0, 0, 0],
+        [0, 0, 0, 1],
+        [0, 0, 1, 0],
+        [0, 0, 0, 0]]
+    ])
+
+# Second observation to explain.
+e_obs2 = np.array([
+    0.,  0.,  1., -1., 
+    0.,  1.,  2., -1., 
+    0.,  1., -1.,  2., 
+    0.,  1.,  1.,  1.
+])
+
+# Possible locations of the mines in the second observation.
+mine_locs2 = np.array(
+    [[
+        [0, 0, 0, 0],
+        [0, 0, 0, 1],
+        [0, 0, 1, 0],
+        [0, 0, 0, 0]]
+    ])
+
+e_obs = np.array([e_ob1, e_obs2])
+mine_locs = {tuple(e_ob1): mine_locs1, 
+             tuple(e_obs2): mine_locs2}
+
 
 if __name__ == '__main__':
 
@@ -48,8 +90,7 @@ if __name__ == '__main__':
 
     # Agent setup
     agent = Agent(env, agent_args)
-    # train_agent(agent, env, total_timesteps=agent_args.total_timesteps, seed=exp_args.seed)
-    value_iteration(env, gamma=agent_args.gamma)
+    train_agent(agent, env, total_timesteps=agent_args.total_timesteps, seed=exp_args.seed)
 
     # Steady-state
     steady_state = get_steady_state(agent, env, exp_args.steady_state)
@@ -58,28 +99,29 @@ if __name__ == '__main__':
 
     # Policy characteristic
     policy_char = PolicyCharacteristic(agent, env, steady_state)
-    policy_char.get_exact(disp=False)
+    policy_char.get_exact()
 
     # Policy Shapley
     policy_shapley = PolicyShapley(policy_char)
-    policy_shapley.get_exact(disp=True, e_obs=e_obs)
+    policy_shapley.get_exact(e_obs=e_obs)
 
     # --------------- Performance ---------------
 
     # Performance characteristic
     performance_char = PerformanceCharacteristic(agent, env, policy_char, steady_state)
-    performance_char.get_exact(disp=False, e_obs=e_obs)
+    performance_char.get_exact_minesweeper(e_obs=e_obs, mine_locs=mine_locs, 
+                                           rollout_eps=exp_args.rollout_eps)
 
     # Performance Shapley
     performance_shapley = PerformanceShapley(performance_char)
-    performance_shapley.get_exact(disp=True, e_obs=e_obs)
+    performance_shapley.get_exact(e_obs=e_obs)
 
-    # # --------------- Value ---------------
+    # --------------- Value ---------------
 
     # Value characteristic
     value_char = ValueCharacteristic(agent, env, steady_state)
-    value_char.get_exact(disp=False)
+    value_char.get_exact()
 
     # Value Shapley
     value_shapley = ValueShapley(value_char)
-    value_shapley.get_exact(disp=True, e_obs=e_obs)
+    value_shapley.get_exact(e_obs=e_obs)

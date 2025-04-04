@@ -32,6 +32,7 @@ def train_agent(agent, env, total_timesteps, seed:int=None):
             avg_r /= count
             if count % 10_000 == 0:
                 pbar.set_description(f'Q-Learning; Avg Return: {avg_r:0.5f}')
+                avg_r, count = 0, 0
 
             # Reset
             obs, _ = env.reset()
@@ -66,8 +67,8 @@ def get_steady_state(agent, env, steps):
         # Display convergence rate
         if (idx + 1) % (steps / 10) == 0:
             dist = np.unique(steady_state[:idx], return_counts=True, axis=0)[1] / (idx + 1)
-            diff = np.mean((old_dist - dist[:len(old_dist)]) ** 2)
-            pbar.set_description(f'Approximating Steady State. Convergence: {diff:0.10f}')
+            diff = np.sqrt(np.mean((old_dist - dist[:len(old_dist)]) ** 2))
+            pbar.set_description(f'Approximating Steady State. Convergence RMSE: {diff:0.10f}')
             old_dist = dist
 
         if terminated or truncated:

@@ -121,8 +121,8 @@ class TicTacToe(gymnasium.Env):
         # Compute the transition probabilities
         self.P = normalise_transitions(P)
 
-        with open('P.pkl', 'wb') as f:
-            pickle.dump(dict(self.P), f)
+        # with open('P.pkl', 'wb') as f:
+        #     pickle.dump(dict(self.P), f)
 
         # with open('P.pkl', 'rb') as f:
         #     self.P = pickle.load(f)

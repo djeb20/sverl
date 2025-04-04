@@ -46,8 +46,8 @@ if __name__ == '__main__':
 
     # Policy characteristic setup
     policy_char = PolicyCharacteristic(agent, env, steady_state)
-    policy_char.get_exact(disp=False)
+    policy_char.get_exact()
 
     # Shapley setup
     policy_shapley = PolicyShapley(policy_char)
-    policy_shapley.get_exact(disp=False)
+    policy_shapley.get_exact()

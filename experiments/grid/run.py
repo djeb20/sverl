@@ -16,7 +16,7 @@ class ExpArgs:
 
 @dataclass
 class AgentArgs:
-    epsilon: float = 1 # Irrelevant because we use value iteration.
+    epsilon: float = 1 # Irrelevant for value iteration.
     """The exploration rate."""
     gamma: float = 1
     """The discount factor."""
@@ -46,12 +46,12 @@ if __name__ == '__main__':
 
     # Policy characteristic setup
     policy_char = PolicyCharacteristic(agent, env, steady_state)
-    policy_char.get_exact(disp=False)
+    policy_char.get_exact()
 
     # Characteristic setup
     performance_char = PerformanceCharacteristic(agent, env, policy_char, steady_state)
-    performance_char.get_exact(disp=False)
+    performance_char.get_exact()
 
     # Shapley setup
     performance_shapley = PerformanceShapley(performance_char)
-    performance_shapley.get_exact(disp=False)
+    performance_shapley.get_exact()

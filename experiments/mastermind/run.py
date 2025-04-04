@@ -14,7 +14,7 @@ class ExpArgs:
     """The environment ID."""
     seed: int = 7 # To get an interesting deterministic policy.
     """The random seed."""
-    steady_state: int = 100_000
+    steady_state: int = 1_000_000
     """The number of state to approximate the steady state."""
 
 @dataclass
@@ -58,28 +58,28 @@ if __name__ == '__main__':
 
     # Policy characteristic
     policy_char = PolicyCharacteristic(agent, env, steady_state)
-    policy_char.get_exact(disp=False)
+    policy_char.get_exact()
 
     # Policy Shapley
     policy_shapley = PolicyShapley(policy_char)
-    policy_shapley.get_exact(disp=False, e_obs=e_obs)
+    policy_shapley.get_exact(e_obs=e_obs)
 
     # --------------- Performance ---------------
 
     # Performance characteristic
     performance_char = PerformanceCharacteristic(agent, env, policy_char, steady_state)
-    performance_char.get_exact(disp=False, e_obs=e_obs)
+    performance_char.get_exact(e_obs=e_obs)
 
     # Performance Shapley
     performance_shapley = PerformanceShapley(performance_char)
-    performance_shapley.get_exact(disp=False, e_obs=e_obs)
+    performance_shapley.get_exact(e_obs=e_obs)
 
     # # --------------- Value ---------------
 
     # Value characteristic
     value_char = ValueCharacteristic(agent, env, steady_state)
-    value_char.get_exact(disp=False)
+    value_char.get_exact()
 
     # Value Shapley
     value_shapley = ValueShapley(value_char)
-    value_shapley.get_exact(disp=False, e_obs=e_obs)
+    value_shapley.get_exact(e_obs=e_obs)

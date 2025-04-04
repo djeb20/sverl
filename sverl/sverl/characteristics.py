@@ -61,7 +61,7 @@ class ValuePolicyCharacteristic(Characteristic):
                 self.exact[*m_ob] = (targets[indexes] * cond_dist[:, None]).sum(axis=0)
 
         if save:
-            with open(f'{self.__class__.__name__.lower()}_char.pkl', "wb") as f:
+            with open(f'{self.__class__.__name__}.pkl', "wb") as f:
                 pickle.dump(self.exact, f)
 
         if disp:
@@ -122,8 +122,7 @@ class PerformanceCharacteristic(Characteristic):
 
     def get_exact(self, disp=False, e_obs=None, save=True):
         """
-        Calculates the exact characteristic values for performance.
-            - Can treat C's and e_obs as part of state and train value iteration for single policy. Much faster.
+        Calculates the exact characteristic values for performance using value iteration.
         """
 
         # Get transition dicionary
@@ -140,13 +139,13 @@ class PerformanceCharacteristic(Characteristic):
         for C in tqdm(self.all_C(), f'Exact {self.__class__.__name__}'):
             for e_ob in e_obs:
 
-                # Performance value iteration with policy pi_hat form performance characteristic definition.
+                # Policy pi_hat from performance characteristic definition.
                 policy = lambda obs: self.exact_pi(obs, e_ob, C)
                 Q_table = value_iteration(self.env, gamma=self.agent.args.gamma, policy=policy)
                 self.exact[*C][*e_ob] = (policy(e_ob) * Q_table[*e_ob]).sum(axis=0, keepdims=True)
-
+                
         if save:
-            with open(f'{self.__class__.__name__.lower()}_char.pkl', "wb") as f:
+            with open(f'{self.__class__.__name__}.pkl', "wb") as f:
                 pickle.dump(self.exact, f)
 
         if disp:
@@ -154,3 +153,123 @@ class PerformanceCharacteristic(Characteristic):
 
     def get_exact_val(self, e_obs, C):
         return self.exact[*C][*e_obs].copy()
+    
+    def get_exact_minesweeper(self, e_obs, mine_locs, rollout_eps, disp=False, save=True):
+        """
+        Calculates the exact characteristic values for performance using rollouts.
+        Only for Minesweeper because env.P cannot be generated.
+        Takes advantage of the domain being non-cyclic, meaning we only need to compute
+        Q(s, a) for all a, then char = pi_C(s, a) * Q(s, a).
+        """
+
+        # First rollout original pi for all a from all states.
+        Q_table = defaultdict(lambda: np.zeros(self.env.action_space.n))
+
+        # Consider every state, action and possible mine locations. Average rollouts.
+        for e_ob in e_obs:
+            for a in tqdm(self.env.valid_actions[e_ob.tobytes()], 'Rollouts...'):
+                for mines in mine_locs[*e_ob]:
+                    for _ in range(rollout_eps // len(mine_locs[*e_ob])):
+
+                        # Reset environment with mines and state
+                        obs, _ = self.env.reset(options={'board': e_ob, 'mines': mines})
+                        action = a; r = 0
+
+                        while True:
+
+                            # Usual RL, choose action, execute, update
+                            obs, reward, terminated, truncated, _ = self.env.step(action)
+                            r += reward
+
+                            # If terminated, average reward over all rollouts
+                            if terminated or truncated:
+
+                                Q_table[*e_ob][a] += r / (len(mine_locs[*e_ob]) * (rollout_eps // len(mine_locs[*e_ob])))                                
+                                break
+                            
+                            # Else, choose action from agent
+                            else:
+                                action = self.agent.choose_action(obs, exp=False)
+
+        # Compute characteristic values
+        self.exact = defaultdict(dict)
+
+        # Loop over all coalitions and states
+        for C in tqdm(self.all_C(), f'Exact {self.__class__.__name__}'):
+            for e_ob in e_obs:
+
+                # sum [ pi_C * Q(s, a) ]
+                self.exact[*C][*e_ob] = (self.exact_pi(e_ob, e_ob, C) * Q_table[*e_ob]).sum(keepdims=True)
+                
+        if save:
+            with open(f'{self.__class__.__name__}.pkl', "wb") as f:
+                pickle.dump(self.exact, f)
+
+        if disp:
+            print(f'Exact characteristic values: {self.exact}')
+
+# --------------------------------------------- OLD CODE --------------------------------------------
+
+# def get_exact_minesweeper(self, e_obs, mine_locs, rollout_eps, disp=False, save=True):
+#         """
+#         Calculates the exact characteristic values for performance using rollouts.
+#         Only for Minesweeper because env.P cannot be generated.
+#         Takes advantage of the domain being non-cyclic, meaning we only need to compute
+#         Q(s, a) for all a, then char = pi_C(s, a) * Q(s, a).
+#         """
+
+#         # First rollout original pi for all a from all states.
+#         Q_table = defaultdict(lambda: np.zeros(self.env.action_space.n))
+
+#         # Consider every state, action and possible mine locations. Average rollouts.
+#         for e_ob in e_obs:
+#             # print(f'Explaining state: {e_ob}')
+#             for a in tqdm(self.env.valid_actions[e_ob.tobytes()], 'Rollouts...'):
+#                 # print(f'Action: {a}')
+#                 for mines in mine_locs[*e_ob]:
+#                     # print(f'Mines: {mines}')
+#                     for _ in range(rollout_eps // len(mine_locs[*e_ob])):
+
+#                         # Reset environment with mines and state
+#                         obs, _ = self.env.reset(options={'board': e_ob, 'mines': mines})
+#                         action = a; r = 0
+
+#                         while True:
+
+#                             # Usual RL, choose action, execute, update
+#                             obs, reward, terminated, truncated, _ = self.env.step(action)
+#                             r += reward
+
+#                             if terminated or truncated:
+#                                 # print(r)
+#                                 break
+#                             else:
+#                                 action = self.agent.choose_action(obs, exp=False)
+
+#                         Q_table[*e_ob][a] += r / (len(mine_locs[*e_ob]) * (rollout_eps // len(mine_locs[*e_ob])))
+
+#                     # print('\n\n\n')
+
+#             # print('\n\n')
+#             # print(f'Rollout Q(s, a): {Q_table[*e_ob]}')
+#             # print(f'Agent Q(s, a): {self.agent.Q_table[*e_ob]}')
+#             # print('\n\n')
+
+#         # raise ValueError('Rollouts not implemented yet.')
+
+#         # Compute characteristic values
+#         self.exact = defaultdict(dict)
+
+#         # Loop over all coalitions and states
+#         for C in tqdm(self.all_C(), f'Exact {self.__class__.__name__}'):
+#             for e_ob in e_obs:
+
+#                 # sum [ pi_C * Q(s, a) ]
+#                 self.exact[*C][*e_ob] = (self.exact_pi(e_ob, e_ob, C) * Q_table[*e_ob]).sum(keepdims=True)
+                
+#         if save:
+#             with open(f'{self.__class__.__name__}_char.pkl', "wb") as f:
+#                 pickle.dump(self.exact, f)
+
+#         if disp:
+#             print(f'Exact characteristic values: {self.exact}')

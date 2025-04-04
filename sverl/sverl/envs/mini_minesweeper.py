@@ -42,9 +42,6 @@ class MiniMinesweeper(gymnasium.Env):
         # Save previously calculated valid actions for boards.
         self.valid_actions = ValidDict()
 
-        # Generate transition dynamics
-        self.get_P()
-
     def seed(self, seed:int):
         """
         Sets seed for environment.
@@ -55,101 +52,29 @@ class MiniMinesweeper(gymnasium.Env):
         self.action_space.seed(seed)
         self.observation_space.seed(seed)
 
-    def get_P(self):
-        """
-        Dynamically generates the transition dynamics
-        """
-
-        # Temporary dict to store transitions
-        P = defaultdict(lambda: defaultdict(list))
-
-        # Helper function to recursively step through environment
-        def inner(obs, action, P): 
-
-            # Coordinates of square
-            action_yx = self.actions[action]
-            n_obs = obs.copy()
-
-            # Hit a mine
-            if self.mines[*action_yx] == 1:
-                n_obs[*action_yx] = 9
-                P[*obs.flatten()][action].append([1., n_obs.flatten(), -1, True, False])
-
-            # Not a mine
-            else:
-                # Reveal square and adjacent squares if square is empty
-                self.reveal(n_obs, *action_yx)
-
-                # Gameover if all squares except mines are revealed.
-                if (n_obs == -1).sum() == self.num_mines: 
-                    P[*obs.flatten()][action].append([1., n_obs.flatten(), 0, True, False])
-                
-                # Else it continues
-                else:
-
-                    # This completes transition
-                    P[*obs.flatten()][action].append([1., n_obs.flatten(), 0, False, False])
-                    
-                    # Loop overactions for next transitions
-                    for action in self.valid_actions[n_obs.tobytes()]:
-                        inner(n_obs, action, P)
-
-        # Consider all possible mine locations.
-        combs = itertools.combinations(range(self.height*self.width), self.num_mines)
-        for mines in tqdm([np.isin(np.arange(self.height * self.width), c).astype(int) for c in combs], 'Generating P'):
-            self.mines = mines.reshape(self.height, self.width)
-            
-            # Consider all actions from initial state
-            for action in range(self.action_space.n):
-                inner(np.full((self.height, self.width), -1, float), action, P)
-
-        # Compute the transition probabilities
-        self.P = normalise_transitions(P)
-
-        with open('P.pkl', 'wb') as f:
-            pickle.dump(dict(self.P), f)
-
-        # with open('P.pkl', 'rb') as f:
-        #     self.P = pickle.load(f)
-
-    def reset(self, seed:int=None):
+    def reset(self, seed:int=None, options:dict={}):
         """
         Resets environment for new game.
-        Mines are placed randomly
+        Mines are placed randomly.
+        Args:
+            - Options can specify mine locations and initial states.
         """
 
         if seed is not None: 
             self.seed(seed)
 
-        # Initialise board
-        self.board = np.full((self.height, self.width), -1, float)
+        # Given options: set mines and board.
+        if options:
+            self.board = options['board'].copy().reshape(self.height, self.width)
+            self.mines = options['mines'].copy().reshape(self.height, self.width)
         
-        # Sample mine locations
-        self.mines = np.zeros((self.height, self.width))
-        self.mines.flat[np.random.choice(self.height * self.width, self.num_mines, replace=False)] = 1
+        else:
+            # Initialise empty board + sample mine randomly
+            self.board = np.full((self.height, self.width), -1, float)
+            self.mines = np.zeros((self.height, self.width))
+            self.mines.flat[np.random.choice(self.height * self.width, self.num_mines, replace=False)] = 1
 
         return self.board.flatten(), {}
-
-    # def step(self, action):
-    #     """
-    #     Agent selects square to open.
-    #     If square is a mine, game ends.
-    #     If square is empty, reveal square and adjacent squares.
-    #     If square is a number, reveal square.
-    #     """
-
-    #     # Check whether action is legal
-    #     if action not in self.valid_actions[self.board.tobytes()]:
-    #         raise ValueError(f"Invalid action: {action}; Valid actions: {self.valid_actions[self.board.tobytes()]}")
-        
-    #     # Next states, rewards and their probabilities
-    #     all_trans = self.P[*self.board][action]
-    #     ps = [row[0] for row in all_trans]
-
-    #     # Stochastically selecting one transition
-    #     self.board, reward, terminated, truncated = all_trans[np.random.choice(len(all_trans), p=ps)][1:]
-
-    #     return self.board.copy(), reward, terminated, truncated, {}
     
     def step(self, action):
         """
@@ -265,9 +190,9 @@ class ValidDict(dict):
     #     # Compute the transition probabilities
     #     self.P = normalise_transitions(P)
 
-# P with all the comments and debugging
+# P through recursion
 
-# def get_P(self):
+#    def get_P(self):
 #         """
 #         Dynamically generates the transition dynamics
 #         """
@@ -277,43 +202,24 @@ class ValidDict(dict):
 
 #         # Helper function to recursively step through environment
 #         def inner(obs, action, P): 
-            
-#             # if self.count == 1_000_000:
-#             #     print(len(set(tuple(sublist) for sublist in self.all_actions)), len(self.all_actions))
-#             #     raise ValueError('Count reached 5!')
 
 #             # Coordinates of square
 #             action_yx = self.actions[action]
+#             n_obs = obs.copy()
 
 #             # Hit a mine
 #             if self.mines[*action_yx] == 1:
-#                 n_obs = obs.copy()
 #                 n_obs[*action_yx] = 9
 #                 P[*obs.flatten()][action].append([1., n_obs.flatten(), -1, True, False])
-
-#                 # print(f'Actions: {actions} \n')
-#                 # print(n_obs.reshape(4, 4), '\n\n')
-#                 # self.all_actions.append(actions)
-
-#                 # print('Mine Hit \n\n')
-#                 # self.count += 1
 
 #             # Not a mine
 #             else:
 #                 # Reveal square and adjacent squares if square is empty
-#                 n_obs = self.reveal(obs.copy(), *action_yx)
-
-#                 # print(f'Actions: {actions} \n')
-#                 # print(n_obs.reshape(4, 4), '\n\n')
-#                 # self.all_actions.append(actions)
+#                 self.reveal(n_obs, *action_yx)
 
 #                 # Gameover if all squares except mines are revealed.
 #                 if (n_obs == -1).sum() == self.num_mines: 
 #                     P[*obs.flatten()][action].append([1., n_obs.flatten(), 0, True, False])
-
-#                     # print('Good Game \n\n')
-#                     # self.count += 1
-#                     # self.all_actions.append(actions)
                 
 #                 # Else it continues
 #                 else:
@@ -323,7 +229,7 @@ class ValidDict(dict):
                     
 #                     # Loop overactions for next transitions
 #                     for action in self.valid_actions[n_obs.tobytes()]:
-#                         inner(n_obs.copy(), action, P)
+#                         inner(n_obs, action, P)
 
 #         # Consider all possible mine locations.
 #         combs = itertools.combinations(range(self.height*self.width), self.num_mines)
@@ -332,33 +238,36 @@ class ValidDict(dict):
             
 #             # Consider all actions from initial state
 #             for action in range(self.action_space.n):
-#                 # self.count = 0
 #                 inner(np.full((self.height, self.width), -1, float), action, P)
-
-#                 # print(f'Mines: {self.mines}')
-#                 # print(f'Action: {action}')
-#                 # print(f'Count: {self.count} \n\n')
-
-#         # self.mines = np.array([[1, 0, 0, 0], 
-#         #                        [0, 0, 1, 0], 
-#         #                        [0, 0, 0, 0], 
-#         #                        [0, 0, 0, 0]])
-        
-#         # action = 1
-#         # self.count = 0
-#         # actions = []
-#         # self.all_actions = []
-
-#         # inner(np.full((self.height, self.width), -1, float), action, P, actions + [action])
-
-#         # print(f'Mines: {self.mines}')
-#         # print(f'Action: {action}')
-#         # print(f'Count: {self.count} \n\n')
-
-#         # print(len(set(tuple(sublist) for sublist in self.all_actions)), len(self.all_actions))
 
 #         # Compute the transition probabilities
 #         self.P = normalise_transitions(P)
 
 #         with open('P.pkl', 'wb') as f:
 #             pickle.dump(dict(self.P), f)
+
+#         # with open('P.pkl', 'rb') as f:
+#         #     self.P = pickle.load(f)
+
+# Step with P
+
+    # def step(self, action):
+    #     """
+    #     Agent selects square to open.
+    #     If square is a mine, game ends.
+    #     If square is empty, reveal square and adjacent squares.
+    #     If square is a number, reveal square.
+    #     """
+
+    #     # Check whether action is legal
+    #     if action not in self.valid_actions[self.board.tobytes()]:
+    #         raise ValueError(f"Invalid action: {action}; Valid actions: {self.valid_actions[self.board.tobytes()]}")
+        
+    #     # Next states, rewards and their probabilities
+    #     all_trans = self.P[*self.board][action]
+    #     ps = [row[0] for row in all_trans]
+
+    #     # Stochastically selecting one transition
+    #     self.board, reward, terminated, truncated = all_trans[np.random.choice(len(all_trans), p=ps)][1:]
+
+    #     return self.board.copy(), reward, terminated, truncated, {}

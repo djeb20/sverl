@@ -14,10 +14,12 @@ class ExpArgs:
     """The environment ID."""
     seed: int = 0
     """The random seed."""
+    steady_state: int = 1_000_000
+    """The number of state to approximate the steady state."""
 
 @dataclass
 class AgentArgs:
-    epsilon: float = 1 # Irrelevant because we use value iteration.
+    epsilon: float = 1 # Irrelevant for value iteration.
     """The exploration rate."""
     gamma: float = 1
     """The discount factor."""
@@ -46,12 +48,18 @@ if __name__ == '__main__':
     agent.Q_table = value_iteration(env, agent_args.gamma)
 
     # Steady-state
-    steady_state = get_steady_state(agent, env, 100_000) 
+    steady_state = get_steady_state(agent, env, exp_args.steady_state)
+    
+    # Steady-state for explained states, to put in paper table.
+    states, dist = np.unique(steady_state, axis=0, return_counts=True)
+    print(f"Steady-state:\
+          p({e_obs[0]}) = {dist[(e_obs[0] == states).all(axis=1)] / dist.sum()};\
+          p({e_obs[1]}) = {dist[(e_obs[1] == states).all(axis=1)] / dist.sum()}")
 
     # Characteristic
     value_char = ValueCharacteristic(agent, env, steady_state)
-    value_char.get_exact(disp=False)
+    value_char.get_exact()
 
     # Shapley
     value_shapley = ValueShapley(value_char)
-    value_shapley.get_exact(disp=False, e_obs=e_obs)
+    value_shapley.get_exact(e_obs=e_obs)

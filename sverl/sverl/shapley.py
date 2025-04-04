@@ -39,11 +39,11 @@ class Shapley:
             Y = np.stack([self.char.get_exact_val(e_ob, C) for C in X]).T
 
             # Solve WLS for each output dimension of the characteristic function (F_card x n, e.g. n_actions for policy)
-            solutions = np.stack([np.linalg.solve(X.T @ W @ X, X.T @ W @ y) for y in Y]).T
+            solutions = np.stack([np.linalg.solve(X.T @ W @ X, X.T @ W @ y) for y in tqdm(Y, 'Exact Shapley per dim')]).T
             self.exact[*e_ob] = self.normalise(e_ob, solutions)
 
         if save:
-            with open(f'{self.__class__.__name__.lower()}_shapley.pkl', "wb") as f:
+            with open(f'{self.__class__.__name__}.pkl', "wb") as f:
                 pickle.dump(self.exact, f)
 
         if disp:
