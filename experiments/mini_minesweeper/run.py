@@ -12,7 +12,7 @@ from sverl.shapley import PolicyShapley, PerformanceShapley, ValueShapley
 class ExpArgs:
     env_id: str = 'MiniMinesweeper-v0'
     """The environment ID."""
-    seed: int = 0
+    seed: int = 1
     """The random seed."""
     steady_state: int = 1_000_000
     """The number of state to approximate the steady state."""
