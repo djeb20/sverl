@@ -21,14 +21,14 @@ def get_box(coord):
     return ret
 
 # Load in the Shapley values (get option actions for policy)
-with open('policyShapley.pkl', 'rb') as file: 
+with open('PolicyShapley.pkl', 'rb') as file: 
     policy_sv = pickle.load(file)
     policy_sv = {state: values[:, action] for (state, values), action in zip(policy_sv.items(), [11, 3])}
 
-with open('performanceShapley.pkl', 'rb') as file: 
+with open('PerformanceShapley.pkl', 'rb') as file: 
     perf_sv = pickle.load(file)
 
-with open('valueShapley.pkl', 'rb') as file: 
+with open('ValueShapley.pkl', 'rb') as file: 
     value_sv = pickle.load(file)
 
 # Initialise figure
@@ -53,7 +53,7 @@ for n, (row, sv, label) in enumerate(zip(
         im = ax.imshow(shapley_values, cmap='RdBu', norm=TwoSlopeNorm(0, -1, 1))
 
         # Reshape state and convert to readable format
-        state = np.array(state, 'O').reshape(4, 4)
+        state = np.array(state, int).astype('O').reshape(4, 4)
         state[state == -1] = ' '
         state[state == 9] = 'M'
 
