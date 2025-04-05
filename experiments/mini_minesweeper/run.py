@@ -99,7 +99,8 @@ if __name__ == '__main__':
 
     # Policy characteristic
     policy_char = PolicyCharacteristic(agent, env, steady_state)
-    policy_char.get_exact()
+    policy_char.get_exact(save=False)
+    raise ValueError("Policy characteristic not implemented yet.")
 
     # Policy Shapley
     policy_shapley = PolicyShapley(policy_char)

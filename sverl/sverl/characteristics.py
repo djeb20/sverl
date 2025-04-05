@@ -33,32 +33,39 @@ class ValuePolicyCharacteristic(Characteristic):
     def __init__(self, agent, env, steady_state):
         super().__init__(agent, env, steady_state)
 
-    def get_exact(self, disp=False, save=True):
+    def get_exact(self, disp=False, e_obs=None, save=True):
         """
         Calculates the exact characteristic values for policy and prediction.
             - Assumes steady_state is a good approximation.
         """
 
         # Approximate steady state.
-        e_obs, dist = np.unique(self.steady_state, axis=0, return_counts=True)
+        all_obs, dist = np.unique(self.steady_state, axis=0, return_counts=True)
         dist = dist / dist.sum()
 
         # Targets
-        targets = np.array([self.v_F(e_ob) for e_ob in e_obs])
+        targets = np.array([self.v_F(ob) for ob in all_obs])
+
+        # States to explain
+        if e_obs is None:
+            e_obs = all_obs.copy()
 
         self.exact = {}
 
         # Loop over coalitions
         for C in tqdm(self.all_C(), f'Exact {self.__class__.__name__}'):
-            m_obs = np.where(C.astype(bool), e_obs, self.mask)
+
+            # Mask all obs and e_obs to find states that match on the coalition
+            m_all_obs = np.where(C.astype(bool), all_obs, self.mask)
+            m_e_obs = np.where(C.astype(bool), e_obs, self.mask)
 
             # Loop over the unique partial observations
-            for m_ob in np.unique(m_obs, axis=0):
+            for m_e_ob in np.unique(m_e_obs, axis=0):
 
                 # Set the characteristic value to the average of the values of the matching observations.
-                indexes = (m_ob == m_obs).all(axis=1)
+                indexes = (m_e_ob == m_all_obs).all(axis=1)
                 cond_dist = dist[indexes] / dist[indexes].sum()
-                self.exact[*m_ob] = (targets[indexes] * cond_dist[:, None]).sum(axis=0)
+                self.exact[*m_e_ob] = (targets[indexes] * cond_dist[:, None]).sum(axis=0)
 
         if save:
             with open(f'{self.__class__.__name__}.pkl', "wb") as f:
