@@ -47,10 +47,10 @@ states = [[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
           [0, 0, 0, 1, 2, 1, 0, 0, -1, -1, -1, -1]]
 
 # Loop over the different SVERL explanations (first is just game state)
-for ii, (row, sv, label) in enumerate(zip(
+for row, sv, label in zip(
     axs.T,
     [{tuple(state): np.zeros(12) for state in states}, policy_sv, perf_sv, value_sv], 
-    ['Episode', 'Policy', 'Performance', 'Value Estimation'])):
+    ['Episode', 'Policy', 'Performance', 'Value Estimation']):
 
     # Loop over the different states
     for i, (ax, state) in enumerate(zip(row, states)):
@@ -58,7 +58,7 @@ for ii, (row, sv, label) in enumerate(zip(
         # Reshape Shapley values and account for numerical errors with steady-state approximation.
         shapley_values = np.flipud(np.reshape(sv[*state], (3, 4))).round(2) 
         
-        # Normalise Shapley values between -1 and 1 (if not all zero)
+        # Scale Shapley values between -1 and 1 (if not all zero)
         if shapley_values.max() - shapley_values.min() != 0:
             shapley_values = shapley_values / max(np.abs(shapley_values.max()), np.abs(shapley_values.min()))
 
@@ -67,7 +67,6 @@ for ii, (row, sv, label) in enumerate(zip(
         state[:, 1:-1] = np.reshape([move_dict[i] for i in state[:, 1:-1].flatten()], (3, 2))
         state[:, 0] = [' ' if value == -1 else value for value in state[:, 0]]
         state[:, -1] = [' ' if value == -1 else value for value in state[:, -1]]
-        
 
         # Create the colourmap (between -1 and 1).
         im = ax.imshow(shapley_values, cmap='RdBu', norm=TwoSlopeNorm(0, -1, 1))

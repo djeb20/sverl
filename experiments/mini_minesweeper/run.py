@@ -57,7 +57,7 @@ mine_locs1 = np.array(
     ])
 
 # Second observation to explain.
-e_obs2 = np.array([
+e_ob2 = np.array([
     0.,  0.,  1., -1., 
     0.,  1.,  2., -1., 
     0.,  1., -1.,  2., 
@@ -73,9 +73,9 @@ mine_locs2 = np.array(
         [0, 0, 0, 0]]
     ])
 
-e_obs = np.array([e_ob1, e_obs2])
+e_obs = np.array([e_ob1, e_ob2])
 mine_locs = {tuple(e_ob1): mine_locs1, 
-             tuple(e_obs2): mine_locs2}
+             tuple(e_ob2): mine_locs2}
 
 
 if __name__ == '__main__':
@@ -99,8 +99,7 @@ if __name__ == '__main__':
 
     # Policy characteristic
     policy_char = PolicyCharacteristic(agent, env, steady_state)
-    policy_char.get_exact(save=False)
-    raise ValueError("Policy characteristic not implemented yet.")
+    policy_char.get_exact(e_obs=e_obs)
 
     # Policy Shapley
     policy_shapley = PolicyShapley(policy_char)
@@ -121,7 +120,7 @@ if __name__ == '__main__':
 
     # Value characteristic
     value_char = ValueCharacteristic(agent, env, steady_state)
-    value_char.get_exact()
+    value_char.get_exact(e_obs=e_obs)
 
     # Value Shapley
     value_shapley = ValueShapley(value_char)

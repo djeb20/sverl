@@ -54,7 +54,7 @@ if __name__ == '__main__':
 
     # Policy characteristic
     policy_char = PolicyCharacteristic(agent, env, steady_state)
-    policy_char.get_exact()
+    policy_char.get_exact(e_obs=e_obs)
 
     # Performance characteristic
     performance_char = PerformanceCharacteristic(agent, env, policy_char, steady_state)
@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
     # Value characteristic
     value_char = ValueCharacteristic(agent, env, steady_state)
-    value_char.get_exact()
+    value_char.get_exact(e_obs=e_obs)
 
     # Value Shapley
     value_shapley = ValueShapley(value_char)
