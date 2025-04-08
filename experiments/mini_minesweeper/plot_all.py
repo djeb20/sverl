@@ -63,8 +63,7 @@ for n, (row, sv, label) in enumerate(zip(
                 text = ax.text(j, k, state[k, j],
                     ha="center", va="center", 
                     color=textcolors[int(abs(shapley_values[k,j]) > 1/2)],
-                    fontweight="bold",
-                              fontsize=fontsize)
+                    fontweight="bold", fontsize=fontsize)
 
         # Title on top axes and place mines for state.                                
         if i == 0: 
@@ -111,7 +110,7 @@ for n, (row, sv, label) in enumerate(zip(
         ax.set_xticks(np.arange(state.shape[1]-1)+.5, minor=False)
         ax.set_yticks(np.arange(state.shape[0]-1)+.5, minor=False)
         ax.grid(which="major", color='k', linestyle='-', linewidth=0.5)
-        ax.tick_params(which="minor", top=False,bottom=False,left=False,right=False)
+        ax.tick_params(which="minor", top=False, bottom=False, left=False, right=False)
 
 # Add colour bar
 cbar = fig.colorbar(im, ax=axs, shrink=.7, fraction=0.1, orientation="vertical", anchor=(3.1, 0.5), pad=0, ticks=[-1, 0, 1])

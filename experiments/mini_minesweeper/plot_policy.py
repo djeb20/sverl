@@ -2,109 +2,131 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import TwoSlopeNorm
-import os
-
-file_name = 'minesweeper_' + os.path.basename(os.path.abspath(__file__))[:-3] + '.pdf'
 
 plt.rcParams.update({
     "text.usetex": True,
     "font.family": "Computer Modern Roman"
 })
+textcolors = ("black", "white")
 
-move_dict = {i : i for i in range(8)}
-move_dict[-1] = ' '
-move_dict[9] = 'M'
+# For marking empty regions with darker boarders
+def get_box(coord):
+    
+    ret = [np.array(coord) + [-0.5, -0.5]]
+    ret.append(ret[-1] + [0, 1])
+    ret.append(ret[-1] + [1, 0])
+    ret.append(ret[-1] + [0, -1])
+    ret.append(ret[-1] + [-1, 0])
+    
+    return ret
 
+# Load in the Shapley values
+with open('PolicyShapley.pkl', 'rb') as file: 
+    policy_sv = pickle.load(file)
+
+# Scale the Shapley values between -1 and 1 across states and actions
+policy_sv = {state: values / np.max([np.abs(values.max(axis=1)), np.abs(values.min(axis=1))], axis=0)
+             for (state, values) in policy_sv.items()}
+
+# For each square, get the Shapley values for opening that square, else zero if the square cannot be opened
+pos_actions = [[3, 7, 10, 11], [3, 7, 10]]
+policy_sv = {state: np.array([values[action, action]
+                              if action in actions 
+                              else 0 
+                              for action in range(16)]) 
+             for (state, values), actions in zip(policy_sv.items(), pos_actions)}
+
+# Initialise figure
+fig, axs = plt.subplots(1, 2)
 fontsize = 15
 
-with open('../local_sverl_pi_all.pkl', 'rb') as file: shap_values_dic = pickle.load(file)
-
-fig, axs = plt.subplots(2, 2, figsize=(10, 8), gridspec_kw={'width_ratios': [1, 2]})
-
-for i, ax in enumerate(axs[:, 0]):
-    state = list(list(shap_values_dic)[i])
-    state_p = np.array([move_dict[int(i)] for i in state]).reshape(4, 4)
+# Loop over the states and Shapley values
+for i, (ax, (state, shapley_values)) in enumerate(zip(axs, policy_sv.items())):
     
-    im = ax.imshow(np.zeros((4, 4)), cmap='RdBu', norm=TwoSlopeNorm(0, -.1, .1))
+    # Reshape Shapley values.
+    shapley_values = shapley_values.reshape(4, 4)
 
+    # Plot Shapley values
+    im = ax.imshow(shapley_values, cmap='RdBu', norm=TwoSlopeNorm(0, -1, 1))
+
+    # Reshape state and convert to readable format
+    state = np.array(state, int).astype('O').reshape(4, 4)
+    state[state == -1] = ' '
+    state[state == 9] = 'M'
+    
     # Loop over data dimensions and create text annotations.
-    for k in range(len(state_p[0])):
-        for j in range(len(state_p[1])):
-            text = ax.text(j, k, state_p[k, j],
+    for k in range(len(state[0])):
+        for j in range(len(state[1])):
+            text = ax.text(j, k, state[k, j],
                 ha="center", va="center", 
-                color="black",
+                color=textcolors[int(abs(shapley_values[k,j]) > 1/2)],
                 fontweight="bold", fontsize=fontsize)
             
+    # Set title
     ax.set_title('State {}'.format(i + 1), fontsize=20)
             
+    # Place mines on first state
     if i == 0: 
-        ax.text(2, 2, '\sc M$_1$', ha="center", va="center", fontweight="bold", color='black', fontsize=fontsize)
-        ax.text(3, 1, '\sc M$_2$?', ha="center", va="center", fontweight="bold", color='black', fontsize=fontsize)
-        ax.text(3, 0, '\sc M$_2$?', ha="center", va="center", fontweight="bold", color='black', fontsize=fontsize)
+        ax.text(2, 2, 'M$_1$', ha="center", va="center", fontweight="bold", 
+                color=textcolors[int(abs(shapley_values[2, 2]) > 1/2)], fontsize=fontsize)
+        ax.text(3, 1, 'M$_2$?', ha="center", va="center", fontweight="bold", 
+                color=textcolors[int(abs(shapley_values[1, 3]) > 1/2)], fontsize=fontsize)
+        ax.text(3, 0, 'M$_2$?', ha="center", va="center", fontweight="bold", 
+                color=textcolors[int(abs(shapley_values[0, 3]) > 1/2)], fontsize=fontsize)
 
-    elif i == 1:
-
-        # Text annotations for bombs
-        ax.text(2, 2, '\sc M$_1$', ha="center", va="center", fontweight="bold", color='black', fontsize=fontsize)
-        ax.text(3, 1, '\sc M$_2$', ha="center", va="center", fontweight="bold", color='black', fontsize=fontsize)
+    # Place mines on second state
+    else:
+        ax.text(2, 2, 'M$_1$', ha="center", va="center", fontweight="bold", 
+                color=textcolors[int(abs(shapley_values[2, 2]) > 1/2)], fontsize=fontsize)
+        ax.text(3, 1, 'M$_2$', ha="center", va="center", fontweight="bold", 
+                color=textcolors[int(abs(shapley_values[1, 3]) > 1/2)], fontsize=fontsize)
 
     for j in range(4):
-        ax.text(j, 3.9, '{}'.format(j+1), ha="center", va="center", fontweight="bold", fontsize=15)
-        ax.text(-0.7, 3 - j, '{}'.format(j+1), ha="center", va="center", fontweight="bold", fontsize=15)
+        ax.text(j, 3.9, '{}'.format(j+1), ha="center", va="center", fontweight="bold", fontsize=fontsize)
+        ax.text(-0.7, 3 - j, '{}'.format(j+1), ha="center", va="center", fontweight="bold", fontsize=fontsize)
 
-    ax.text(1.5, 4.2, '$x$', ha="center", va="center", fontweight="bold", fontsize=20)
-    ax.text(-1, 1.5, '$y$', ha="center", va="center", fontweight="bold", fontsize=20)
+    # Place coordinates on the axes
+    for j in range(4):
+
+        # y-coordinates only on left column
+        if i == 0:
+            ax.text(-0.7, 3 - j, '{}'.format(j+1), ha="center", va="center", fontweight="bold", fontsize=fontsize)
+            ax.text(-1, 1.5, '$y$', ha="center", va="center", fontweight="bold", fontsize=fontsize)
+        
+        # x-coordinates
+        if i == 1:
+            ax.text(j, 3.9, '{}'.format(j+1), ha="center", va="center", fontweight="bold", fontsize=fontsize)
+            ax.text(1.5, 4.2, '$x$', ha="center", va="center", fontweight="bold", fontsize=fontsize)
 
     # Remove tickmarks
     ax.tick_params(labelbottom=False, bottom=False, labelleft=False, left=False)
+    
     # Turn spines off and create white grid.
     ax.spines[:].set_linewidth(2)
 
+    # Plotting bold lines around empty grid squares
+    empty_coords = np.array(np.where(state == ' ')).T
+    boxes = np.array([get_box(coord[::-1]) for coord in empty_coords])
+    pairs = np.array([box[ind:ind+2] for box in boxes for ind in range(len(box[:-1]))])
+    for _, box in enumerate(boxes):
+        for ind in range(len(box[:-1])):
+            coords = box[ind:ind+2]                
+            if not (np.flipud(coords) == pairs).all(axis=(1, 2)).any():
+                ax.plot(coords.T[0], coords.T[1], c='k', lw=1.5)
 
-    ax.set_xticks(np.arange(state_p.shape[1]-1)+.5, minor=False)
-    ax.set_yticks(np.arange(state_p.shape[0]-1)+.5, minor=False)
+    # Set ticks
+    ax.set_xticks(np.arange(state.shape[1]-1)+.5, minor=False)
+    ax.set_yticks(np.arange(state.shape[0]-1)+.5, minor=False)
     ax.grid(which="major", color='k', linestyle='-', linewidth=0.5)
-    ax.tick_params(which="minor", top=False,bottom=False,left=False,right=False)
+    ax.tick_params(which="minor", top=False, bottom=False, left=False, right=False)
 
-# ----------------------------------------------------------------------------------------
+# Add colour bar
+cbar = fig.colorbar(im, ax=axs, shrink=.7, fraction=0.1, orientation="vertical", anchor=(3.1, 0.5), pad=0, ticks=[-1, 0, 1])
+cbar.ax.tick_params(labelsize=fontsize)
 
-w = 0.2
-bars = []
+fig.supylabel('Shapley Value', x=1.1, fontsize=fontsize, rotation=-90, ha='right')
 
-for ax, state_ind, actions, features, actions_coords, title, offsets in zip(axs[:, 1], [0, 1], 
-                                                                   [[3, 7, 10, 11], [3, 7, 10]], 
-                                                                   [[3, 7, 10, 11], [3, 7, 10]],
-                                                                   [[(4, 4), (4, 3), (3, 2), (4, 2)], [(4, 4), (4, 3), (3, 2)]],
-                                                                   ['State 1', 'State 2'],
-                                                                           [[i * w for i in [-1.5, -0.5, 0.5, 1.5]], 
-                                                                            [i * w for i in [-1, 0, 1]]]):
-
-    shap_values_dic_ind = {key: value for i, (key, value) in enumerate(shap_values_dic.items()) if i == state_ind}
-
-    # [feature, action]
-    values = np.array([[value[feature][action] for action in actions] for feature in features for value in shap_values_dic_ind.values()])
-
-    x_axs = np.arange(len(actions))
-
-    for action, label in enumerate(['$\pi(s, a_{{{}{}}})$'.format(*action) for action in actions_coords]):
-        
-        bars.append(ax.bar(x_axs + offsets[action], values[:, action], label=label, width=w))
-
-    if state_ind == 1: 
-        ax.set_xlabel('Feature', fontsize=18)     
-        ax.set_ylim(-.1, .1)
-        ax.set_yticks([-.1, 0, .1])
-    else: 
-        ax.set_title('Explaining Policy', fontsize=19)
-        ax.legend(fontsize=17, ncol=2, loc='upper left')
-        
-    ax.set_ylabel('Shapley Value', fontsize=19)
-    ax.set_xticks(x_axs, actions_coords)
-    # ax.set_title(title, fontsize=15)
-
-    ax.tick_params(axis='both', labelsize=17)
-
-    ax.axhline(0, color='grey', linewidth=0.5,linestyle='--')
-
-plt.subplots_adjust(wspace=0.4)
-plt.savefig(file_name, bbox_inches='tight', transparent=True)
+# Adjust layout and save figure
+plt.subplots_adjust(bottom=-.65, left=-0.2)
+plt.tight_layout()
+plt.savefig('minesweeper_policy.pdf', bbox_inches='tight', transparent=True)
