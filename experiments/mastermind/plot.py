@@ -50,7 +50,7 @@ states = [[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
 for row, sv, label in zip(
     axs.T,
     [{tuple(state): np.zeros(12) for state in states}, policy_sv, perf_sv, value_sv], 
-    ['Episode', 'Policy', 'Performance', 'Value Estimation']):
+    ['Episode', 'Behaviour', 'Performance', 'Value Estimation']):
 
     # Loop over the different states
     for i, (ax, state) in enumerate(zip(row, states)):
