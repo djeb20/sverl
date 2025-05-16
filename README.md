@@ -21,14 +21,6 @@ If you need help to use SVERL, please open an issue or contact djeb20 AT bath DO
 If you use find this code useful for your research, please consider citing our works:
 
 ```
-@inproceedings{beechey2023explaining,
-  title={Explaining reinforcement learning with shapley values},
-  author={Beechey, Daniel and Smith, Thomas MS and {\c{S}}im{\c{s}}ek, {\"O}zg{\"u}r},
-  booktitle={International Conference on Machine Learning},
-  pages={2003--2014},
-  year={2023},
-  organization={PMLR}
-}
 @article{beechey2025theoretical,
   title={A Theoretical Framework for Explaining Reinforcement Learning with Shapley Values},
   author={Beechey, Daniel and Smith, Thomas and {\c{S}}im{\c{s}}ek, {\"O}zg{\"u}r},
