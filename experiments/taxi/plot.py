@@ -50,7 +50,7 @@ axes[1][2].sharey(axes[0][2])
 for col, sv, title in zip(
     axes.T, 
     [policy_sv, perf_sv, value_sv],
-    ['Policy', 'Performance', 'Value Estimation']
+    ['Policy', 'Performance', 'Prediction']
     ):
 
     # Loop over the different states and their Shapley values

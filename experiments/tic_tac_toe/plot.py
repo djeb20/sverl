@@ -30,7 +30,7 @@ fig, axs = plt.subplots(1, 2, figsize=(5, 3))
 # Set the range for the color map
 range_values = 0.3
         
-for ax, label, filename in zip(axs, ['Value Estimation', 'Performance'], ['ValueShapley.pkl', 'PerformanceShapley.pkl']):
+for ax, label, filename in zip(axs, ['Performance', 'Prediction'], ['PerformanceShapley.pkl', 'ValueShapley.pkl']):
 
     # Load the data
     with open(filename, 'rb') as file:
