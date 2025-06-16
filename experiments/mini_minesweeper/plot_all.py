@@ -39,7 +39,7 @@ fontsize = 12 # 15
 for n, (row, sv, label) in enumerate(zip(
     axs.T,
     [{tuple(state): np.zeros(16) for state in policy_sv}, policy_sv, perf_sv, value_sv],
-    ['Episode', 'Behaviour', 'Performance', 'Value Estimation'])):
+    ['Episode', 'Behaviour', 'Performance', 'Prediction'])):
 
     # Loop over the different states
     for i, (ax, (state, shapley_values)) in enumerate(zip(row, sv.items())):
