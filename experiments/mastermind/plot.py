@@ -47,17 +47,19 @@ states = [[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
           [0, 0, 0, 1, 2, 1, 0, 0, -1, -1, -1, -1]]
 
 # Loop over the different SVERL explanations (first is just game state)
-for row, sv, label in zip(
+actions = ["AA", "BA", "AB"]  # Actions to show in 'Episode' column
+
+for col_idx, (row, sv, label) in enumerate(zip(
     axs.T,
     [{tuple(state): np.zeros(12) for state in states}, policy_sv, perf_sv, value_sv], 
-    ['Episode', 'Behaviour', 'Performance', 'Prediction']):
+    ['Episode', 'Behaviour', 'Outcome', 'Prediction'])):
 
     # Loop over the different states
     for i, (ax, state) in enumerate(zip(row, states)):
 
         # Reshape Shapley values and account for numerical errors with steady-state approximation.
-        shapley_values = np.flipud(np.reshape(sv[*state], (3, 4))).round(2) 
-        
+        shapley_values = np.flipud(np.reshape(sv[*state], (3, 4))).round(2)
+
         # Scale Shapley values between -1 and 1 (if not all zero)
         if shapley_values.max() - shapley_values.min() != 0:
             shapley_values = shapley_values / max(np.abs(shapley_values.max()), np.abs(shapley_values.min()))
@@ -79,9 +81,16 @@ for row, sv, label in zip(
                     color=textcolors[int(abs(shapley_values[k, j]) > 1/2)],
                     fontweight="bold", fontsize=fontsize)
 
+        # For 'Episode' column, add the action in light red
+        if col_idx == 0:
+            ax.text(1, state.shape[0] - i - 1, actions[i][0],
+                    ha="center", va="center", color="#16bd31", fontweight="bold", fontsize=fontsize)
+            ax.text(2, state.shape[0] - i - 1, actions[i][1],
+                    ha="center", va="center", color="#16bd31", fontweight="bold", fontsize=fontsize)
+
         # Remove tickmarks
         ax.tick_params(labelbottom=False, bottom=False, labelleft=False, left=False)
-       
+
         # Turn spines off and create white grid.
         ax.spines[:].set_linewidth(2)
 
